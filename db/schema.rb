@@ -30,8 +30,12 @@ ActiveRecord::Schema.define(:version => 20130311153635) do
     t.string   "api_call",        :null => false
     t.string   "kb_payment_id"
     t.string   "coinbase_txn_id"
+    t.string   "coinbase_hsh"
     t.string   "coinbase_created_at"
     t.string   "coinbase_request"
+    t.integer  "coinbase_amount_in_cents"
+    t.string   "coinbase_currency"
+    t.string   "coinbase_notes"
     t.string   "coinbase_status"
     t.string   "coinbase_sender_id"
     t.string   "coinbase_sender_name"
@@ -39,6 +43,7 @@ ActiveRecord::Schema.define(:version => 20130311153635) do
     t.string   "coinbase_recipient_id"
     t.string   "coinbase_recipient_name"
     t.string   "coinbase_recipient_email"
+    t.string   "coinbase_recipient_address"
     t.boolean  "success"
     t.datetime "created_at",        :null => false
     t.datetime "updated_at",        :null => false

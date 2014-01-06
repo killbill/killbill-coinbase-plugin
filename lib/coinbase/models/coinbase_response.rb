@@ -4,8 +4,12 @@ module Killbill::Coinbase
     attr_accessible :api_call,
                     :kb_payment_id,
                     :coinbase_txn_id,
+                    :coinbase_hsh,
                     :coinbase_created_at,
                     :coinbase_request,
+                    :coinbase_amount_in_cents,
+                    :coinbase_currency,
+                    :coinbase_notes,
                     :coinbase_status,
                     :coinbase_sender_id,
                     :coinbase_sender_name,
@@ -13,24 +17,39 @@ module Killbill::Coinbase
                     :coinbase_recipient_id,
                     :coinbase_recipient_name,
                     :coinbase_recipient_email,
+                    :coinbase_recipient_address,
                     :success
 
     def self.from_response(api_call, kb_payment_id, response)
-      CoinbaseResponse.new({
+      coinbase_response = {
                             :api_call => api_call,
                             :kb_payment_id => kb_payment_id,
-                            :coinbase_txn_id => response.transaction.id,
-                            :coinbase_created_at => response.transaction.created_at,
-                            :coinbase_request => response.transaction.request,
-                            :coinbase_status => response.transaction.status,
-                            :coinbase_sender_id => response.transaction.sender.id,
-                            :coinbase_sender_name => response.transaction.sender.name,
-                            :coinbase_sender_email => response.transaction.sender.email,
-                            :coinbase_recipient_id => response.transaction.recipient.id,
-                            :coinbase_recipient_name => response.transaction.recipient.name,
-                            :coinbase_recipient_email => response.transaction.recipient.email,
                             :success => response.success
-                           })
+                          }
+
+      unless response.transaction.blank?
+        coinbase_response.merge!({
+                                   :coinbase_txn_id => response.transaction.id,
+                                   :coinbase_hsh => response.transaction.hsh,
+                                   :coinbase_created_at => response.transaction.created_at,
+                                   :coinbase_request => response.transaction.request,
+                                   # response.transaction.amount is a Money object.
+                                   # Note that for BTC, 1 cent is 1 Satoshi (1/100000000)
+                                   :coinbase_amount_in_cents => response.transaction.amount.cents,
+                                   :coinbase_currency => response.transaction.amount.currency.iso_code,
+                                   :coinbase_notes => response.transaction.notes,
+                                   :coinbase_status => response.transaction.status,
+                                   :coinbase_sender_id => response.transaction.sender.id,
+                                   :coinbase_sender_name => response.transaction.sender.name,
+                                   :coinbase_sender_email => response.transaction.sender.email,
+                                   :coinbase_recipient_id => response.transaction.recipient.id,
+                                   :coinbase_recipient_name => response.transaction.recipient.name,
+                                   :coinbase_recipient_email => response.transaction.recipient.email,
+                                   :coinbase_recipient_address => response.transaction.recipient_address
+                                 })
+      end
+
+      CoinbaseResponse.new(coinbase_response);
     end
 
     def to_payment_response
@@ -54,8 +73,11 @@ module Killbill::Coinbase
         amount_in_cents = coinbase_transaction.amount_in_cents
         currency = coinbase_transaction.currency
         created_date = coinbase_transaction.created_at
-        first_payment_reference_id = coinbase_txn_id
-        second_payment_reference_id = nil
+        # We store the hash as the first_payment_reference_id to
+        # make sure it is available in the refund info object
+        # (required by the killbill-bitcoin-plugin).
+        first_payment_reference_id = coinbase_hsh
+        second_payment_reference_id = coinbase_txn_id
       end
 
       effective_date = coinbase_created_at
