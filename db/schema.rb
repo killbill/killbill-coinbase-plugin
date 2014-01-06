@@ -15,13 +15,14 @@ ActiveRecord::Schema.define(:version => 20130311153635) do
 
   create_table "coinbase_transactions", :force => true do |t|
     t.integer  "coinbase_response_id", :null => false
-    t.string   "api_call",          :null => false
-    t.string   "kb_payment_id",     :null => false
-    t.string   "coinbase_txn_id",   :null => false
-    t.integer  "amount_in_cents",   :null => false
-    t.string   "currency",          :null => false
-    t.datetime "created_at",        :null => false
-    t.datetime "updated_at",        :null => false
+    t.string   "api_call",             :null => false
+    t.string   "kb_payment_id",        :null => false
+    t.string   "kb_payment_method_id", :null => false
+    t.string   "coinbase_txn_id",      :null => false
+    t.integer  "amount_in_cents",      :null => false
+    t.string   "currency",             :null => false
+    t.datetime "created_at",           :null => false
+    t.datetime "updated_at",           :null => false
   end
 
   add_index(:coinbase_transactions, :kb_payment_id)

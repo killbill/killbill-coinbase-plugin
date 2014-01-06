@@ -79,6 +79,8 @@ describe Killbill::Coinbase::CoinbaseResponse do
     currency = 'BTC'
     kb_payment_id = SecureRandom.uuid
 
+    fake_transactions
+
     fake_send_money MERCHANT_API_BTC_ADDRESS
 
     payment_response = @plugin.process_payment pm.kb_account_id, kb_payment_id, pm.kb_payment_method_id, amount, currency
@@ -112,12 +114,13 @@ describe Killbill::Coinbase::CoinbaseResponse do
     response.coinbase_recipient_email.should == 'user1@example.com'
     response.coinbase_recipient_address.should == MERCHANT_API_BTC_ADDRESS
 
+    # Verify through the API, this will update the record
     payment_response = @plugin.get_payment_info pm.kb_account_id, kb_payment_id
     payment_response.amount.should == amount
     payment_response.currency.should == currency
     payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
-    payment_response.status.should == :PENDING
-    payment_response.gateway_error.should == "pending"
+    payment_response.status.should == :PROCESSED
+    payment_response.gateway_error.should == "complete"
     payment_response.gateway_error_code.should be_nil
     payment_response.first_payment_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
     payment_response.second_payment_reference_id.should == "501a1791f8182b2071000087"
@@ -159,13 +162,13 @@ describe Killbill::Coinbase::CoinbaseResponse do
     # Whereas the rest of the response is the same (same mock), the recipient will have changed
     response.coinbase_recipient_address.should == 'muVu2JZo8PbewBHRp6bpqFvVD87qvqEHWA'
 
-    # Check we can retrieve the refund
+    # Verify through the API, this will update the record
     refund_response = @plugin.get_refund_info pm.kb_account_id, kb_payment_id
     refund_response.amount.should == amount
     refund_response.currency.should == currency
     refund_response.effective_date.should == "2012-08-01T23:00:49-07:00"
-    refund_response.status.should == :PENDING
-    refund_response.gateway_error.should == "pending"
+    refund_response.status.should == :PROCESSED
+    refund_response.gateway_error.should == "complete"
     refund_response.gateway_error_code.should be_nil
     refund_response.reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
 
@@ -228,6 +231,71 @@ eos
 }
 eos
     fake :get, "/account/receive_address", response
+  end
+
+  def fake_transactions
+    # The second transaction shares the id with 501a1791f8182b2071000087 above
+    # to check the status field is updated correctly when fetching the payment or refund info
+    response = <<eos
+{
+  "current_user": {
+    "id": "5011f33df8182b142400000e",
+    "email": "user2@example.com",
+    "name": "User Two"
+  },
+  "balance": {
+    "amount": "50.00000000",
+    "currency": "BTC"
+  },
+  "total_count": 2,
+  "num_pages": 1,
+  "current_page": 1,
+  "transactions": [
+    {
+      "transaction": {
+        "id": "5018f833f8182b129c00002f",
+        "created_at": "2012-08-01T02:34:43-07:00",
+        "amount": {
+          "amount": "-1.10000000",
+          "currency": "BTC"
+        },
+        "request": true,
+        "status": "pending",
+        "sender": {
+          "id": "5011f33df8182b142400000e",
+          "name": "User Two",
+          "email": "user2@example.com"
+        },
+        "recipient": {
+          "id": "5011f33df8182b142400000a",
+          "name": "User One",
+          "email": "user1@example.com"
+        }
+      }
+    },
+    {
+      "transaction": {
+        "id": "501a1791f8182b2071000087",
+        "created_at": "2012-08-01T23:00:49-07:00",
+        "hsh": "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3",
+        "amount": {
+          "amount": "-1.23400000",
+          "currency": "BTC"
+        },
+        "request": false,
+        "status": "complete",
+        "sender": {
+          "id": "5011f33df8182b142400000e",
+          "name": "User Two",
+          "email": "user2@example.com"
+        },
+        "recipient_address": "37muSN5ZrukVTvyVh3mT5Zc5ew9L9CBare"
+      }
+    }
+ ]
+}
+eos
+    fake :get, "/transactions", response
   end
 
   def create_kb_account(kb_account_id)

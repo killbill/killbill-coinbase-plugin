@@ -52,6 +52,11 @@ module Killbill::Coinbase
       CoinbaseResponse.new(coinbase_response);
     end
 
+    def update_from_coinbase_transaction(transaction)
+      # Are there any other field to update?
+      update_attributes(:coinbase_status => transaction.status) unless transaction.nil?
+    end
+
     def to_payment_response
       to_killbill_response :payment
     end
@@ -80,6 +85,13 @@ module Killbill::Coinbase
         second_payment_reference_id = coinbase_txn_id
       end
 
+      if success and coinbase_status == 'pending'
+        status = :PENDING
+      elsif success and coinbase_status == 'complete'
+        status = :PROCESSED
+      else
+        status = :ERROR
+      end
       effective_date = coinbase_created_at
       gateway_error = coinbase_status
       gateway_error_code = nil
@@ -90,7 +102,7 @@ module Killbill::Coinbase
         p_info_plugin.currency = currency
         p_info_plugin.created_date = created_date
         p_info_plugin.effective_date = effective_date
-        p_info_plugin.status = (success ? :PENDING : :ERROR)
+        p_info_plugin.status = status
         p_info_plugin.gateway_error = gateway_error
         p_info_plugin.gateway_error_code = gateway_error_code
         p_info_plugin.first_payment_reference_id = first_payment_reference_id
@@ -102,7 +114,7 @@ module Killbill::Coinbase
         r_info_plugin.currency = currency
         r_info_plugin.created_date = created_date
         r_info_plugin.effective_date = effective_date
-        r_info_plugin.status = (success ? :PENDING : :ERROR)
+        r_info_plugin.status = status
         r_info_plugin.gateway_error = gateway_error
         r_info_plugin.gateway_error_code = gateway_error_code
         r_info_plugin.reference_id = first_payment_reference_id

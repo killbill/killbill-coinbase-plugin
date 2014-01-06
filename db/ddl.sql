@@ -16,6 +16,7 @@ CREATE TABLE `coinbase_transactions` (
   `coinbase_response_id` int(11) NOT NULL,
   `api_call` varchar(255) NOT NULL,
   `kb_payment_id` varchar(255) NOT NULL,
+  `kb_payment_method_id` varchar(255) NOT NULL,
   `coinbase_txn_id` varchar(255) NOT NULL,
   `amount_in_cents` int(11) NOT NULL,
   `currency` varchar(255) NOT NULL,

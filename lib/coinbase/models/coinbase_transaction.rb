@@ -1,7 +1,7 @@
 module Killbill::Coinbase
   class CoinbaseTransaction < ActiveRecord::Base
     belongs_to :coinbase_response
-    attr_accessible :amount_in_cents, :currency, :api_call, :kb_payment_id, :coinbase_txn_id
+    attr_accessible :amount_in_cents, :currency, :api_call, :kb_payment_id, :kb_payment_method_id, :coinbase_txn_id
 
     def self.from_kb_payment_id(kb_payment_id)
       single_transaction_from_kb_payment_id :charge, kb_payment_id
@@ -33,6 +33,10 @@ module Killbill::Coinbase
       raise "Amount #{amount_in_cents} too large to refund for payment #{kb_payment_id}" if amount_left_to_refund_in_cents < amount_in_cents
 
       coinbase_transactions.first
+    end
+
+    def coinbase_payment_method
+      CoinbasePaymentMethod.where(kb_payment_method_id: kb_payment_method_id).first!
     end
   end
 end
