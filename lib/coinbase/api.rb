@@ -24,11 +24,9 @@ module Killbill::Coinbase
       # Retrieve the Coinbase payment method
       coinbase_pm = CoinbasePaymentMethod.from_kb_payment_method_id(kb_payment_method_id)
 
-      merchant_address = Killbill::Coinbase.config[:coinbase][:btc_address]
-
       # Go to Coinbase
-      gateway = Killbill::Coinbase.gateway_for_api_key(coinbase_pm.api_key)
-      coinbase_response = coinbase.send_money merchant_address, amount.to_money(currency), description
+      gateway = Killbill::Coinbase.gateway_for_api_key(coinbase_pm.coinbase_api_key)
+      coinbase_response = gateway.send_money Killbill::Coinbase.merchant_btc_address, amount.to_money(currency), description
 
       # Regardless of the input currency, the actual payment is in BTC
       response = save_response_and_transaction coinbase_response, :charge, kb_payment_id, amount_in_cents, 'BTC'
@@ -50,11 +48,12 @@ module Killbill::Coinbase
       description = options[:description] || "Kill Bill refund for #{kb_payment_id}"
 
       # Retrieve the transaction
-      coinbase_transaction = CoinbaseTransaction.find_candidate_transaction_for_refund(kb_payment_id, actual_amount)
+      coinbase_transaction = CoinbaseTransaction.find_candidate_transaction_for_refund(kb_payment_id, amount)
 
       # Go to Coinbase
-      gateway = Killbill::Coinbase.gateway_for_api_key(Killbill::Coinbase.config[:coinbase][:api_key])
-      coinbase_response = coinbase.send_money merchant_address, amount.to_money(currency), description
+      gateway = Killbill::Coinbase.gateway_for_api_key(Killbill::Coinbase.merchant_api_key)
+      btc_address = gateway.receive_address.address
+      coinbase_response = gateway.send_money btc_address, amount.to_money(currency), description
 
       # Regardless of the input currency, the actual refund is in BTC
       response = save_response_and_transaction coinbase_response, :refund, kb_payment_id, amount_in_cents, 'BTC'

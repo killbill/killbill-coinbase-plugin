@@ -34,6 +34,7 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'jbundler', '~> 0.4.1'
   s.add_development_dependency 'rake', '>= 10.0.0'
   s.add_development_dependency 'rspec', '~> 2.12.0'
+  s.add_development_dependency "fakeweb", '~> 1.3'
   if defined?(JRUBY_VERSION)
     s.add_development_dependency 'activerecord-jdbcsqlite3-adapter', '~> 1.2.6'
   else

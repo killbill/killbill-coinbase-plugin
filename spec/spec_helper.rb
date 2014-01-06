@@ -1,5 +1,5 @@
 require 'bundler'
-require 'coinbase'
+require 'killbill_coinbase'
 
 require 'logger'
 

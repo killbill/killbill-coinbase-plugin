@@ -1,4 +1,6 @@
 require 'logger'
+# Coinbase gem
+require 'coinbase'
 
 module Killbill::Coinbase
   mattr_reader :logger
@@ -16,10 +18,9 @@ module Killbill::Coinbase
     @@config = Properties.new(config_file)
     @@config.parse!
     @@test = @@config[:coinbase][:test]
+    @@base_uri = @@config[:coinbase][:base_uri] || 'https://coinbase.com/api/v1'
 
     @@logger.log_level = Logger::DEBUG if (@@config[:logger] || {})[:debug]
-
-    @@currency_conversions = @@config[:currency_conversions]
 
     if defined?(JRUBY_VERSION)
       # See https://github.com/jruby/activerecord-jdbc-adapter/issues/302
@@ -33,12 +34,15 @@ module Killbill::Coinbase
     @@initialized = true
   end
 
-  def self.converted_currency(currency)
-    currency_sym = currency.to_s.upcase.to_sym
-    @@currency_conversions && @@currency_conversions[currency_sym]
+  def self.merchant_api_key
+    Killbill::Coinbase.config[:coinbase][:api_key]
+  end
+
+  def self.merchant_btc_address
+    Killbill::Coinbase.config[:coinbase][:btc_address]
   end
 
   def self.gateway_for_api_key(api_key)
-    Coinbase::Client.new(api_key)
+    ::Coinbase::Client.new(api_key, { :base_uri => @@base_uri })
   end
 end

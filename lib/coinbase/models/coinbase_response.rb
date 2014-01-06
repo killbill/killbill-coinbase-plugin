@@ -12,22 +12,24 @@ module Killbill::Coinbase
                     :coinbase_sender_email,
                     :coinbase_recipient_id,
                     :coinbase_recipient_name,
-                    :coinbase_recipient_email
+                    :coinbase_recipient_email,
+                    :success
 
     def self.from_response(api_call, kb_payment_id, response)
       CoinbaseResponse.new({
                             :api_call => api_call,
                             :kb_payment_id => kb_payment_id,
-                            :coinbase_txn_id => response.id,
-                            :coinbase_created_at => response.created_at,
-                            :coinbase_request => response.request,
-                            :coinbase_status => response.status,
-                            :coinbase_sender_id => response.sender.id,
-                            :coinbase_sender_name => response.sender.name,
-                            :coinbase_sender_email => response.sender.email,
-                            :coinbase_recipient_id => response.recipient.id,
-                            :coinbase_recipient_name => response.recipient.name,
-                            :coinbase_recipient_email => response.recipient.email,
+                            :coinbase_txn_id => response.transaction.id,
+                            :coinbase_created_at => response.transaction.created_at,
+                            :coinbase_request => response.transaction.request,
+                            :coinbase_status => response.transaction.status,
+                            :coinbase_sender_id => response.transaction.sender.id,
+                            :coinbase_sender_name => response.transaction.sender.name,
+                            :coinbase_sender_email => response.transaction.sender.email,
+                            :coinbase_recipient_id => response.transaction.recipient.id,
+                            :coinbase_recipient_name => response.transaction.recipient.name,
+                            :coinbase_recipient_email => response.transaction.recipient.email,
+                            :success => response.success
                            })
     end
 
@@ -56,8 +58,8 @@ module Killbill::Coinbase
         second_payment_reference_id = nil
       end
 
-      effective_date = created_at
-      gateway_error = status
+      effective_date = coinbase_created_at
+      gateway_error = coinbase_status
       gateway_error_code = nil
 
       if type == :payment
@@ -66,7 +68,7 @@ module Killbill::Coinbase
         p_info_plugin.currency = currency
         p_info_plugin.created_date = created_date
         p_info_plugin.effective_date = effective_date
-        p_info_plugin.status = :PENDING
+        p_info_plugin.status = (success ? :PENDING : :ERROR)
         p_info_plugin.gateway_error = gateway_error
         p_info_plugin.gateway_error_code = gateway_error_code
         p_info_plugin.first_payment_reference_id = first_payment_reference_id
@@ -78,7 +80,7 @@ module Killbill::Coinbase
         r_info_plugin.currency = currency
         r_info_plugin.created_date = created_date
         r_info_plugin.effective_date = effective_date
-        r_info_plugin.status = :PENDING
+        r_info_plugin.status = (success ? :PENDING : :ERROR)
         r_info_plugin.gateway_error = gateway_error
         r_info_plugin.gateway_error_code = gateway_error_code
         r_info_plugin.reference_id = first_payment_reference_id

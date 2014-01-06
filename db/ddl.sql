@@ -39,6 +39,7 @@ CREATE TABLE `coinbase_responses` (
   `coinbase_recipient_id` varchar(255) DEFAULT NULL,
   `coinbase_recipient_name` varchar(255) DEFAULT NULL,
   `coinbase_recipient_email` varchar(255) DEFAULT NULL,
+  `success` tinyint(1) DEFAULT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`)
