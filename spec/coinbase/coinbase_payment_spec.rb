@@ -3,22 +3,6 @@ require 'fakeweb'
 
 require 'spec_helper'
 
-class FakeJavaUserAccountApi
-  attr_accessor :accounts
-
-  def initialize
-    @accounts = []
-  end
-
-  def get_account_by_id(id, context)
-    @accounts.find { |account| account.id == id.to_s }
-  end
-
-  def get_account_by_key(external_key, context)
-    @accounts.find { |account| account.external_key == external_key.to_s }
-  end
-end
-
 describe Killbill::Coinbase::CoinbaseResponse do
   BASE_URI = 'http://fake.com/api/v1' # switching to http (instead of https) seems to help FakeWeb
   MERCHANT_API_BTC_ADDRESS = '37muSN5ZrukVTvyVh3mT5Zc5ew9L9CBare'
@@ -43,9 +27,7 @@ describe Killbill::Coinbase::CoinbaseResponse do
       @plugin.logger.level = Logger::INFO
       @plugin.conf_dir = File.dirname(file)
 
-      @account_api = FakeJavaUserAccountApi.new
-      svcs = {:account_user_api => @account_api}
-      @plugin.kb_apis = Killbill::Plugin::KillbillApi.new('coinbase', svcs)
+      @plugin.kb_apis = Killbill::Plugin::KillbillApi.new('coinbase', {})
 
       # Start the plugin here - since the config file will be deleted
       @plugin.start_plugin
@@ -298,28 +280,9 @@ eos
     fake :get, "/transactions", response
   end
 
-  def create_kb_account(kb_account_id)
-    external_key = Time.now.to_i.to_s + '-test'
-    email = external_key + '@tester.com'
-
-    account = Killbill::Plugin::Model::Account.new
-    account.id = kb_account_id
-    account.external_key = external_key
-    account.email = email
-    account.name = 'Integration spec'
-    account.currency = :USD
-
-    @account_api.accounts << account
-
-    return external_key, kb_account_id
-  end
-
   def create_payment_method
     kb_account_id = SecureRandom.uuid
     kb_payment_method_id = SecureRandom.uuid
-
-    # Create a new account
-    create_kb_account kb_account_id
 
     # Generate a token in Coinbase
     coinbase_api_key = '123456789012345678901324567890abcdefghi'

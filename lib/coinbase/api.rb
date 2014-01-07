@@ -81,7 +81,6 @@ module Killbill::Coinbase
       api_key = find_value_from_payment_method_props payment_method_props, 'apiKey'
       raise ArgumentError.new("No api key specified") if (api_key.blank?)
 
-      currency = account_currency(kb_account_id)
       CoinbasePaymentMethod.create :kb_account_id => kb_account_id,
                                    :kb_payment_method_id => kb_payment_method_id,
                                    :coinbase_api_key => api_key
@@ -148,11 +147,6 @@ module Killbill::Coinbase
     def find_value_from_payment_method_props(payment_method_props, key)
       prop = (payment_method_props.properties.find { |kv| kv.key == key })
       prop.nil? ? nil : prop.value
-    end
-
-    def account_currency(kb_account_id)
-      account = @kb_apis.account_user_api.get_account_by_id(kb_account_id, @kb_apis.create_context)
-      account.currency
     end
 
     def save_response_and_transaction(coinbase_response, api_call, kb_payment_id=nil, kb_payment_method_id=nil, amount_in_cents=0, currency=nil)
