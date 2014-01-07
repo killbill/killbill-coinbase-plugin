@@ -18,9 +18,7 @@ In this version, users need to provide their Coinbase API key. This is unfortuna
 
 To enable API access, go to https://coinbase.com/account/integrations, click "Show My API Key", enter your password and click enable.
 
-Then, go to http://$HOST:8080/plugins/killbill-coinbase?kb_account_id=13d26090-b8d7-11e2-9e96-0800200c9a66 and enter your key.
-
-Finally, save the key in Kill Bill:
+Then, save the key in Kill Bill as a new payment method:
 
 ```
 curl -v \
