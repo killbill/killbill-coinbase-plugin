@@ -20,6 +20,9 @@ module Killbill::Coinbase
                     :coinbase_recipient_address,
                     :success
 
+    alias_attribute :processed_amount_in_cents, :coinbase_amount_in_cents
+    alias_attribute :processed_currency, :coinbase_currency
+
     def self.from_response(api_call, kb_payment_id, response)
       coinbase_response = {
                             :api_call => api_call,
@@ -30,6 +33,9 @@ module Killbill::Coinbase
       unless response.transaction.blank?
         coinbase_response.merge!({
                                    :coinbase_txn_id => response.transaction.id,
+                                   # We may not get the hash right away, but it will be eventually
+                                   # populated (see update_from_coinbase_transaction below)
+                                   # Also, we don't get one if we are sending funds between Coinbase accounts
                                    :coinbase_hsh => response.transaction.hsh,
                                    :coinbase_created_at => response.transaction.created_at,
                                    :coinbase_request => response.transaction.request,
@@ -38,23 +44,68 @@ module Killbill::Coinbase
                                    :coinbase_amount_in_cents => response.transaction.amount.cents,
                                    :coinbase_currency => response.transaction.amount.currency.iso_code,
                                    :coinbase_notes => response.transaction.notes,
-                                   :coinbase_status => response.transaction.status,
+                                   :coinbase_status => response.transaction.status
+                                })
+      end
+
+      unless response.transaction.amount.blank?
+        coinbase_response.merge!({
+                                   # response.transaction.amount is a Money object.
+                                   # Note that for BTC, 1 cent is 1 Satoshi (1/100000000)
+                                   :coinbase_amount_in_cents => response.transaction.amount.cents,
+                                   :coinbase_currency => response.transaction.amount.currency.iso_code
+                                })
+      end
+
+      unless response.transaction.sender.blank?
+        coinbase_response.merge!({
                                    :coinbase_sender_id => response.transaction.sender.id,
                                    :coinbase_sender_name => response.transaction.sender.name,
-                                   :coinbase_sender_email => response.transaction.sender.email,
+                                   :coinbase_sender_email => response.transaction.sender.email
+                                })
+      end
+
+      unless response.transaction.recipient.blank?
+        coinbase_response.merge!({
                                    :coinbase_recipient_id => response.transaction.recipient.id,
                                    :coinbase_recipient_name => response.transaction.recipient.name,
                                    :coinbase_recipient_email => response.transaction.recipient.email,
                                    :coinbase_recipient_address => response.transaction.recipient_address
-                                 })
+                                })
       end
 
       CoinbaseResponse.new(coinbase_response);
     end
 
+    def self.start_refreshing_transactions(delay = 120, logger = nil)
+      Thread.every(delay) {
+        to_refresh = 0
+        refreshed = 0
+
+        Killbill::Coinbase::CoinbaseResponse.where(:coinbase_status => 'pending').each do |response|
+          to_refresh += 1
+
+          coinbase_transaction = response.coinbase_transaction
+          pm = coinbase_transaction.coinbase_payment_method
+
+          # Go to Coinbase to update the transaction state
+          gateway = Killbill::Coinbase.gateway_for_api_key(pm.coinbase_api_key)
+          # TODO https://coinbase.com/api/doc/1.0/transactions/show.html doesn't seem implemented yet :(
+          transaction = gateway.transactions.transactions.find { |tx| tx.transaction.id == coinbase_transaction.coinbase_txn_id }
+
+          unless transaction.nil?
+            new_response = response.update_from_coinbase_transaction(transaction.transaction)
+            refreshed += 1 if transaction.transaction.status != 'pending'
+          end
+        end
+
+        logger.info "Refreshed #{refreshed}/#{to_refresh} transaction(s) with Coinbase" if !logger.nil? and to_refresh > 0
+      }
+    end
+
     def update_from_coinbase_transaction(transaction)
       # Are there any other field to update?
-      update_attributes(:coinbase_status => transaction.status) unless transaction.nil?
+      update_attributes(:coinbase_status => transaction.status, :coinbase_hsh => transaction.hsh) unless transaction.nil?
     end
 
     def to_payment_response
@@ -75,8 +126,8 @@ module Killbill::Coinbase
         first_payment_reference_id = nil
         second_payment_reference_id = nil
       else
-        amount_in_cents = coinbase_transaction.amount_in_cents
-        currency = coinbase_transaction.currency
+        amount_in_cents = coinbase_transaction.processed_amount_in_cents
+        currency = coinbase_transaction.processed_currency
         created_date = coinbase_transaction.created_at
         # We store the hash as the first_payment_reference_id to
         # make sure it is available in the refund info object
@@ -85,9 +136,14 @@ module Killbill::Coinbase
         second_payment_reference_id = coinbase_txn_id
       end
 
-      if success and coinbase_status == 'pending'
+      if success and (!coinbase_hsh.blank? or coinbase_status == 'pending')
+        # If we have a hash, always mark it as pending so the bitcoin-plugin
+        # can monitor confirmations for that hash
         status = :PENDING
       elsif success and coinbase_status == 'complete'
+        # For Coinbase to Coinbase exchanges, we won't have a hash unfortunately
+        # and the coinbase_status will be complete right away. We have to trust
+        # them in that case since we can't monitor confirmations
         status = :PROCESSED
       else
         status = :ERROR
@@ -98,7 +154,7 @@ module Killbill::Coinbase
 
       if type == :payment
         p_info_plugin = Killbill::Plugin::Model::PaymentInfoPlugin.new
-        p_info_plugin.amount = BigDecimal.new(amount_in_cents.to_s) / 100.0 if amount_in_cents
+        p_info_plugin.amount = Money.new(amount_in_cents, currency).to_d if currency
         p_info_plugin.currency = currency
         p_info_plugin.created_date = created_date
         p_info_plugin.effective_date = effective_date
@@ -110,7 +166,7 @@ module Killbill::Coinbase
         p_info_plugin
       else
         r_info_plugin = Killbill::Plugin::Model::RefundInfoPlugin.new
-        r_info_plugin.amount = BigDecimal.new(amount_in_cents.to_s) / 100.0 if amount_in_cents
+        r_info_plugin.amount = Money.new(amount_in_cents, currency).to_d if currency
         r_info_plugin.currency = currency
         r_info_plugin.created_date = created_date
         r_info_plugin.effective_date = effective_date

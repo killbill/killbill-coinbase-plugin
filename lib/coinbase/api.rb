@@ -3,9 +3,19 @@ module Killbill::Coinbase
     def start_plugin
       Killbill::Coinbase.initialize! @logger, @conf_dir, @kb_apis
 
+      @transactions_refreshes = Killbill::Coinbase::CoinbaseResponse.start_refreshing_transactions Killbill::Coinbase.transactions_refresh_interval, @logger
+
       super
 
       @logger.info 'Killbill::Coinbase::PaymentPlugin started'
+    end
+
+    def stop_plugin
+      @transactions_refreshes.cancel
+
+      super
+
+      @logger.info 'Killbill::Coinbase::PaymentPlugin stopped'
     end
 
     # return DB connections to the Pool if required
@@ -14,7 +24,8 @@ module Killbill::Coinbase
     end
 
     def process_payment(kb_account_id, kb_payment_id, kb_payment_method_id, amount, currency, call_context = nil, options = {})
-      amount_in_cents = (amount * 100).to_i
+      # Use Money to compute the amount in cents, as it depends on the currency (1 cent of BTC is 1 Satoshi, not 0.01 BTC)
+      amount_in_cents = Money.new_with_amount(amount, currency).cents.to_i
       description = options[:description] || "Kill Bill payment for #{kb_payment_id}"
 
       # If the payment was already made, just return the status
@@ -34,7 +45,6 @@ module Killbill::Coinbase
       response.to_payment_response
     end
 
-
     def get_payment_info(kb_account_id, kb_payment_id, tenant_context = nil, options = {})
       coinbase_transaction = CoinbaseTransaction.from_kb_payment_id(kb_payment_id)
 
@@ -48,7 +58,8 @@ module Killbill::Coinbase
     end
 
     def process_refund(kb_account_id, kb_payment_id, amount, currency, call_context = nil, options = {})
-      amount_in_cents = (amount * 100).to_i
+      # Use Money to compute the amount in cents, as it depends on the currency (1 cent of BTC is 1 Satoshi, not 0.01 BTC)
+      amount_in_cents = Money.new_with_amount(amount, currency).cents.to_i
       description = options[:description] || "Kill Bill refund for #{kb_payment_id}"
 
       # Retrieve the transaction
@@ -160,6 +171,9 @@ module Killbill::Coinbase
         # Record the transaction
         transaction = response.create_coinbase_transaction!(:amount_in_cents => amount_in_cents,
                                                             :currency => currency,
+                                                            # Coinbase return negative values for charges
+                                                            :processed_amount_in_cents => response.processed_amount_in_cents.abs,
+                                                            :processed_currency => response.processed_currency,
                                                             :api_call => api_call,
                                                             :kb_payment_id => kb_payment_id,
                                                             :kb_payment_method_id => kb_payment_method_id,

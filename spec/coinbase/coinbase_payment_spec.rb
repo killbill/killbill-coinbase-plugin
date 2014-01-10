@@ -7,34 +7,12 @@ describe Killbill::Coinbase::CoinbaseResponse do
   BASE_URI = 'http://fake.com/api/v1' # switching to http (instead of https) seems to help FakeWeb
   MERCHANT_API_BTC_ADDRESS = '37muSN5ZrukVTvyVh3mT5Zc5ew9L9CBare'
 
-  before(:all) do
-    Dir.mktmpdir do |dir|
-      file = File.new(File.join(dir, 'coinbase.yml'), "w+")
-      file.write(<<-eos)
-:coinbase:
-  :btc_address: '#{MERCHANT_API_BTC_ADDRESS}'
-  :api_key: '5678'
-  :base_uri: '#{BASE_URI}'
-# As defined by spec_helper.rb
-:database:
-  :adapter: 'sqlite3'
-  :database: 'test.db'
-      eos
-      file.close
-
-      @plugin = Killbill::Coinbase::PaymentPlugin.new
-      @plugin.logger = Logger.new(STDOUT)
-      @plugin.logger.level = Logger::INFO
-      @plugin.conf_dir = File.dirname(file)
-
-      @plugin.kb_apis = Killbill::Plugin::KillbillApi.new('coinbase', {})
-
-      # Start the plugin here - since the config file will be deleted
-      @plugin.start_plugin
-    end
+  after(:each) do
+    @plugin.stop_plugin
   end
 
   it 'should be able to create and retrieve payment methods' do
+    start_plugin
     pm = create_payment_method
 
     pms = @plugin.get_payment_methods(pm.kb_account_id)
@@ -56,9 +34,12 @@ describe Killbill::Coinbase::CoinbaseResponse do
   end
 
   it 'should be able to charge and refund' do
+    start_plugin
     pm = create_payment_method
     amount = BigDecimal.new("0.01")
-    currency = 'BTC'
+    currency = 'USD'
+    processed_amount = Money.new_with_amount(1.234, 'BTC').to_d
+    processed_currency = 'BTC'
     kb_payment_id = SecureRandom.uuid
 
     fake_transactions
@@ -66,8 +47,8 @@ describe Killbill::Coinbase::CoinbaseResponse do
     fake_send_money MERCHANT_API_BTC_ADDRESS
 
     payment_response = @plugin.process_payment pm.kb_account_id, kb_payment_id, pm.kb_payment_method_id, amount, currency
-    payment_response.amount.should == amount
-    payment_response.currency.should == currency
+    payment_response.amount.should == processed_amount
+    payment_response.currency.should == processed_currency
     payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     payment_response.status.should == :PENDING
     payment_response.gateway_error.should == "pending"
@@ -98,10 +79,10 @@ describe Killbill::Coinbase::CoinbaseResponse do
 
     # Verify through the API, this will update the record
     payment_response = @plugin.get_payment_info pm.kb_account_id, kb_payment_id
-    payment_response.amount.should == amount
-    payment_response.currency.should == currency
+    payment_response.amount.should == processed_amount
+    payment_response.currency.should == processed_currency
     payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
-    payment_response.status.should == :PROCESSED
+    payment_response.status.should == :PENDING # Still pending because we have a hash
     payment_response.gateway_error.should == "complete"
     payment_response.gateway_error_code.should be_nil
     payment_response.first_payment_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
@@ -114,8 +95,8 @@ describe Killbill::Coinbase::CoinbaseResponse do
     fake_receive_address 'muVu2JZo8PbewBHRp6bpqFvVD87qvqEHWA'
 
     refund_response = @plugin.process_refund pm.kb_account_id, kb_payment_id, amount, currency
-    refund_response.amount.should == amount
-    refund_response.currency.should == currency
+    refund_response.amount.should == processed_amount
+    refund_response.currency.should == processed_currency
     refund_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     refund_response.status.should == :PENDING
     refund_response.gateway_error.should == "pending"
@@ -146,10 +127,10 @@ describe Killbill::Coinbase::CoinbaseResponse do
 
     # Verify through the API, this will update the record
     refund_response = @plugin.get_refund_info pm.kb_account_id, kb_payment_id
-    refund_response.amount.should == amount
-    refund_response.currency.should == currency
+    refund_response.amount.should == processed_amount
+    refund_response.currency.should == processed_currency
     refund_response.effective_date.should == "2012-08-01T23:00:49-07:00"
-    refund_response.status.should == :PROCESSED
+    refund_response.status.should == :PENDING # Still pending because we have a hash
     refund_response.gateway_error.should == "complete"
     refund_response.gateway_error_code.should be_nil
     refund_response.reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
@@ -157,29 +138,64 @@ describe Killbill::Coinbase::CoinbaseResponse do
     # Make sure we can charge again the same payment method
     second_kb_payment_id = SecureRandom.uuid
 
-    fake_send_money MERCHANT_API_BTC_ADDRESS
+    # No hash this time
+    fake_send_money(MERCHANT_API_BTC_ADDRESS, nil)
 
     payment_response = @plugin.process_payment pm.kb_account_id, second_kb_payment_id, pm.kb_payment_method_id, amount, currency
-    payment_response.amount.should == amount
-    payment_response.currency.should == currency
+    payment_response.amount.should == processed_amount
+    payment_response.currency.should == processed_currency
     payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
-    payment_response.status.should == :PENDING
+    payment_response.status.should == :PENDING # Pending because no hash, but status is pending
     payment_response.gateway_error.should == "pending"
+    payment_response.gateway_error_code.should be_nil
+    payment_response.first_payment_reference_id.should be_blank
+    payment_response.second_payment_reference_id.should == "501a1791f8182b2071000087"
+
+    # Verify through the API, this will update the record
+    payment_response = @plugin.get_payment_info pm.kb_account_id, second_kb_payment_id
+    payment_response.amount.should == processed_amount
+    payment_response.currency.should == processed_currency
+    payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
+    payment_response.status.should == :PENDING # Pending because we now have a hash
+    payment_response.gateway_error.should == "complete"
     payment_response.gateway_error_code.should be_nil
     payment_response.first_payment_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
     payment_response.second_payment_reference_id.should == "501a1791f8182b2071000087"
   end
 
+  it 'should refresh transactions periodically' do
+    start_plugin(0.1)
+    pm = create_payment_method
+    amount = BigDecimal.new("0.01")
+    currency = 'USD'
+    kb_payment_id = SecureRandom.uuid
+
+    fake_transactions
+
+    # No hash
+    fake_send_money(MERCHANT_API_BTC_ADDRESS, nil)
+
+    @plugin.process_payment pm.kb_account_id, kb_payment_id, pm.kb_payment_method_id, amount, currency
+    response = Killbill::Coinbase::CoinbaseResponse.find_by_api_call_and_kb_payment_id :charge, kb_payment_id
+    response.coinbase_hsh.should be_blank
+
+    sleep 2
+
+    # Don't verify through the API (which triggers a refresh)
+    response = Killbill::Coinbase::CoinbaseResponse.find_by_api_call_and_kb_payment_id :charge, kb_payment_id
+    response.coinbase_hsh.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
+  end
+
   private
 
-  def fake_send_money(recipient_address)
+  def fake_send_money(recipient_address, hash="9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3")
     response = <<eos
 {
   "success": true,
   "transaction": {
     "id": "501a1791f8182b2071000087",
     "created_at": "2012-08-01T23:00:49-07:00",
-    "hsh": "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3",
+    "hsh": "#{hash}",
     "notes": "Sample transaction for you!",
     "amount": {
       "amount": "-1.23400000",
@@ -312,5 +328,34 @@ eos
 
   def fake method, path, body
     FakeWeb.register_uri(method, "#{BASE_URI}#{path}", body: body)
+  end
+
+  # Large value, so it's not in our way
+  def start_plugin(transactions_refresh_interval=10000)
+    Dir.mktmpdir do |dir|
+      file = File.new(File.join(dir, 'coinbase.yml'), "w+")
+      file.write(<<-eos)
+:coinbase:
+  :btc_address: '#{MERCHANT_API_BTC_ADDRESS}'
+  :api_key: '5678'
+  :base_uri: '#{BASE_URI}'
+  :refresh_interval: #{transactions_refresh_interval}
+# As defined by spec_helper.rb
+:database:
+  :adapter: 'sqlite3'
+  :database: 'test.db'
+      eos
+      file.close
+
+      @plugin = Killbill::Coinbase::PaymentPlugin.new
+      @plugin.logger = Logger.new(STDOUT)
+      @plugin.logger.level = Logger::INFO
+      @plugin.conf_dir = File.dirname(file)
+
+      @plugin.kb_apis = Killbill::Plugin::KillbillApi.new('coinbase', {})
+
+      # Start the plugin here - since the config file will be deleted
+      @plugin.start_plugin
+    end
   end
 end

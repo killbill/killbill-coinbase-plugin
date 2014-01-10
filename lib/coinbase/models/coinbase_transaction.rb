@@ -1,7 +1,14 @@
 module Killbill::Coinbase
   class CoinbaseTransaction < ActiveRecord::Base
     belongs_to :coinbase_response
-    attr_accessible :amount_in_cents, :currency, :api_call, :kb_payment_id, :kb_payment_method_id, :coinbase_txn_id
+    attr_accessible :amount_in_cents,
+                    :currency,
+                    :processed_amount_in_cents,
+                    :processed_currency,
+                    :api_call,
+                    :kb_payment_id,
+                    :kb_payment_method_id,
+                    :coinbase_txn_id
 
     def self.from_kb_payment_id(kb_payment_id)
       single_transaction_from_kb_payment_id :charge, kb_payment_id

@@ -34,6 +34,10 @@ module Killbill::Coinbase
     @@initialized = true
   end
 
+  def self.transactions_refresh_interval
+    Killbill::Coinbase.config[:coinbase][:refresh_interval] || 120
+  end
+
   def self.merchant_api_key
     Killbill::Coinbase.config[:coinbase][:api_key]
   end
