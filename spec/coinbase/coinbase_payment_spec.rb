@@ -101,7 +101,8 @@ describe Killbill::Coinbase::CoinbaseResponse do
     refund_response.status.should == :PENDING
     refund_response.gateway_error.should == "pending"
     refund_response.gateway_error_code.should be_nil
-    refund_response.reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
+    refund_response.first_refund_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
+    refund_response.second_refund_reference_id.should == "501a1791f8182b2071000087"
 
     # Verify our table directly
     response = Killbill::Coinbase::CoinbaseResponse.find_by_api_call_and_kb_payment_id :refund, kb_payment_id
@@ -126,14 +127,17 @@ describe Killbill::Coinbase::CoinbaseResponse do
     response.coinbase_recipient_address.should == 'muVu2JZo8PbewBHRp6bpqFvVD87qvqEHWA'
 
     # Verify through the API, this will update the record
-    refund_response = @plugin.get_refund_info pm.kb_account_id, kb_payment_id
+    refund_responses = @plugin.get_refund_info pm.kb_account_id, kb_payment_id
+    refund_responses.size.should == 1
+    refund_response = refund_responses[0]
     refund_response.amount.should == processed_amount
     refund_response.currency.should == processed_currency
     refund_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     refund_response.status.should == :PENDING # Still pending because we have a hash
     refund_response.gateway_error.should == "complete"
     refund_response.gateway_error_code.should be_nil
-    refund_response.reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
+    refund_response.first_refund_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
+    refund_response.second_refund_reference_id.should == "501a1791f8182b2071000087"
 
     # Make sure we can charge again the same payment method
     second_kb_payment_id = SecureRandom.uuid

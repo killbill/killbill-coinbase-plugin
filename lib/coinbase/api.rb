@@ -77,15 +77,19 @@ module Killbill::Coinbase
     end
 
     def get_refund_info(kb_account_id, kb_payment_id, tenant_context = nil, options = {})
-      coinbase_transaction = CoinbaseTransaction.refund_from_kb_payment_id(kb_payment_id)
+      coinbase_transactions = CoinbaseTransaction.refunds_from_kb_payment_id(kb_payment_id)
 
-      # Go to Coinbase to update the transaction state
-      gateway = Killbill::Coinbase.gateway_for_api_key(coinbase_transaction.coinbase_payment_method.coinbase_api_key)
-      # TODO https://coinbase.com/api/doc/1.0/transactions/show.html doesn't seem implemented yet :(
-      transaction = gateway.transactions.transactions.find { |tx| tx.transaction.id == coinbase_transaction.coinbase_txn_id }
-      coinbase_transaction.coinbase_response.update_from_coinbase_transaction(transaction.transaction) unless transaction.nil?
+      refund_infos = []
+      coinbase_transactions.each do |coinbase_transaction|
+        # Go to Coinbase to update the transaction state
+        gateway = Killbill::Coinbase.gateway_for_api_key(coinbase_transaction.coinbase_payment_method.coinbase_api_key)
+        # TODO https://coinbase.com/api/doc/1.0/transactions/show.html doesn't seem implemented yet :(
+        transaction = gateway.transactions.transactions.find { |tx| tx.transaction.id == coinbase_transaction.coinbase_txn_id }
+        coinbase_transaction.coinbase_response.update_from_coinbase_transaction(transaction.transaction) unless transaction.nil?
 
-      coinbase_transaction.coinbase_response.to_refund_response
+        refund_infos << coinbase_transaction.coinbase_response.to_refund_response
+      end
+      refund_infos
     end
 
     def add_payment_method(kb_account_id, kb_payment_method_id, payment_method_props, set_default, call_context = nil, options = {})
@@ -147,6 +151,14 @@ module Killbill::Coinbase
                                      :kb_payment_method_id => payment_method_info_plugin.payment_method_id,
                                      :coinbase_api_key => payment_method_info_plugin.external_payment_method_id
       end
+    end
+
+    def search_payments(search_key, offset = 0, limit = 100, call_context = nil, options = {})
+      CoinbaseResponse.search(search_key, offset, limit, :payment)
+    end
+
+    def search_refunds(search_key, offset = 0, limit = 100, call_context = nil, options = {})
+      CoinbaseResponse.search(search_key, offset, limit, :refund)
     end
 
     def search_payment_methods(search_key, offset = 0, limit = 100, call_context = nil, options = {})

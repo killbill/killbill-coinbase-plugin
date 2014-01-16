@@ -116,6 +116,54 @@ module Killbill::Coinbase
       to_killbill_response :refund
     end
 
+    # VisibleForTesting
+    def self.search_query(api_call, search_key, offset = nil, limit = nil)
+      t = self.arel_table
+
+      # Exact matches only
+      where_clause =     t[:coinbase_txn_id].eq(search_key)
+                     .or(t[:coinbase_hsh].eq(search_key))
+                     .or(t[:coinbase_sender_id].eq(search_key))
+                     .or(t[:coinbase_sender_email].eq(search_key))
+                     .or(t[:coinbase_recipient_id].eq(search_key))
+                     .or(t[:coinbase_recipient_email].eq(search_key))
+
+      # Only search successful payments and refunds
+      where_clause = where_clause.and(t[:api_call].eq(api_call))
+                                 .and(t[:success].eq(true))
+
+      query = t.where(where_clause)
+               .order(t[:id])
+
+      if offset.blank? and limit.blank?
+        # true is for count distinct
+        query.project(t[:id].count(true))
+      else
+        query.skip(offset) unless offset.blank?
+        query.take(limit) unless limit.blank?
+        query.project(t[Arel.star])
+        # Not chainable
+        query.distinct
+      end
+      query
+    end
+
+    def self.search(search_key, offset = 0, limit = 100, type = :payment)
+      api_call = type == :payment ? 'charge' : 'refund'
+      pagination = Killbill::Plugin::Model::Pagination.new
+      pagination.current_offset = offset
+      pagination.total_nb_records = self.count_by_sql(self.search_query(api_call, search_key))
+      pagination.max_nb_records = self.where(:api_call => api_call, :success => true).count
+      pagination.next_offset = (!pagination.total_nb_records.nil? && offset + limit >= pagination.total_nb_records) ? nil : offset + limit
+      # Reduce the limit if the specified value is larger than the number of records
+      actual_limit = [pagination.max_nb_records, limit].min
+        pagination.iterator = StreamyResultSet.new(actual_limit) do |offset,limit|
+        self.find_by_sql(self.search_query(api_call, search_key, offset, limit))
+            .map { |x| type == :payment ? x.to_payment_response : x.to_refund_response }
+      end
+      pagination
+    end
+
     private
 
     def to_killbill_response(type)
@@ -129,11 +177,8 @@ module Killbill::Coinbase
         amount_in_cents = coinbase_transaction.processed_amount_in_cents
         currency = coinbase_transaction.processed_currency
         created_date = coinbase_transaction.created_at
-        # We store the hash as the first_payment_reference_id to
-        # make sure it is available in the refund info object
-        # (required by the killbill-bitcoin-plugin).
-        first_payment_reference_id = coinbase_hsh
-        second_payment_reference_id = coinbase_txn_id
+        first_reference_id = coinbase_hsh
+        second_reference_id = coinbase_txn_id
       end
 
       if success and (!coinbase_hsh.blank? or coinbase_status == 'pending')
@@ -154,6 +199,7 @@ module Killbill::Coinbase
 
       if type == :payment
         p_info_plugin = Killbill::Plugin::Model::PaymentInfoPlugin.new
+        p_info_plugin.kb_payment_id = kb_payment_id
         p_info_plugin.amount = Money.new(amount_in_cents, currency).to_d if currency
         p_info_plugin.currency = currency
         p_info_plugin.created_date = created_date
@@ -161,11 +207,12 @@ module Killbill::Coinbase
         p_info_plugin.status = status
         p_info_plugin.gateway_error = gateway_error
         p_info_plugin.gateway_error_code = gateway_error_code
-        p_info_plugin.first_payment_reference_id = first_payment_reference_id
-        p_info_plugin.second_payment_reference_id = second_payment_reference_id
+        p_info_plugin.first_payment_reference_id = first_reference_id
+        p_info_plugin.second_payment_reference_id = second_reference_id
         p_info_plugin
       else
         r_info_plugin = Killbill::Plugin::Model::RefundInfoPlugin.new
+        r_info_plugin.kb_payment_id = kb_payment_id
         r_info_plugin.amount = Money.new(amount_in_cents, currency).to_d if currency
         r_info_plugin.currency = currency
         r_info_plugin.created_date = created_date
@@ -173,7 +220,8 @@ module Killbill::Coinbase
         r_info_plugin.status = status
         r_info_plugin.gateway_error = gateway_error
         r_info_plugin.gateway_error_code = gateway_error_code
-        r_info_plugin.reference_id = first_payment_reference_id
+        r_info_plugin.first_refund_reference_id = first_reference_id
+        r_info_plugin.second_refund_reference_id = second_reference_id
         r_info_plugin
       end
     end

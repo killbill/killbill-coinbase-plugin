@@ -11,18 +11,11 @@ module Killbill::Coinbase
                     :coinbase_txn_id
 
     def self.from_kb_payment_id(kb_payment_id)
-      single_transaction_from_kb_payment_id :charge, kb_payment_id
+      transaction_from_kb_payment_id :charge, kb_payment_id, :single
     end
 
-    def self.refund_from_kb_payment_id(kb_payment_id)
-      single_transaction_from_kb_payment_id :refund, kb_payment_id
-    end
-
-    def self.single_transaction_from_kb_payment_id(api_call, kb_payment_id)
-      coinbase_transactions = find_all_by_api_call_and_kb_payment_id(api_call, kb_payment_id)
-      raise "Unable to find Coinbase transaction id for payment #{kb_payment_id}" if coinbase_transactions.empty?
-      raise "Killbill payment mapping to multiple Coinbase transactions for payment #{kb_payment_id}" if coinbase_transactions.size > 1
-      coinbase_transactions[0]
+    def self.refunds_from_kb_payment_id(kb_payment_id)
+      transaction_from_kb_payment_id :refund, kb_payment_id, :multiple
     end
 
     def self.find_candidate_transaction_for_refund(kb_payment_id, amount_in_cents)
@@ -44,6 +37,19 @@ module Killbill::Coinbase
 
     def coinbase_payment_method
       CoinbasePaymentMethod.where(kb_payment_method_id: kb_payment_method_id).first!
+    end
+
+    private
+
+    def self.transaction_from_kb_payment_id(api_call, kb_payment_id, how_many)
+      coinbase_transactions = find_all_by_api_call_and_kb_payment_id(api_call, kb_payment_id)
+      raise "Unable to find Coinbase transaction id for payment #{kb_payment_id}" if coinbase_transactions.empty?
+      if how_many == :single
+        raise "Killbill payment mapping to multiple Coinbase transactions for payment #{kb_payment_id}" if coinbase_transactions.size > 1
+        coinbase_transactions[0]
+      else
+        coinbase_transactions
+      end
     end
   end
 end
