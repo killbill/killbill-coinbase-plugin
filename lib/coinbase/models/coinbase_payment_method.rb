@@ -1,10 +1,21 @@
 module Killbill::Coinbase
   class CoinbasePaymentMethod < ActiveRecord::Base
-    attr_accessible :kb_account_id,
-                    :kb_payment_method_id,
-                    :coinbase_api_key
 
-    alias_attribute :external_payment_method_id, :coinbase_api_key
+    COINBASE_API_KEY_KEY = "apiKey"
+    COINBASE_ACCESS_TOKEN_KEY = "accessToken"
+    COINBASE_REFRESH_TOKEN_KEY = "refreshToken"
+
+    attr_accessible :kb_account_id,
+                    :kb_payment_method_id
+
+    # API Key access
+    attr_encrypted :coinbase_api_key
+    # OAuth access
+    attr_encrypted :coinbase_access_token
+    attr_encrypted :coinbase_refresh_token
+
+    # We cannot use either the coinbase_api_key (can be revoked) or the access_token (it expires)
+    alias_attribute :external_payment_method_id, :id
 
     def self.from_kb_account_id(kb_account_id)
       find_all_by_kb_account_id_and_is_deleted(kb_account_id, false)
@@ -27,8 +38,9 @@ module Killbill::Coinbase
     def self.search_query(search_key, offset = nil, limit = nil)
       t = self.arel_table
 
-      # Exact match for coinbase_api_key
-      where_clause = t[:coinbase_api_key].eq(search_key)
+      # Exact match for payment method id. We cannot easily search keys as they are encrypted.
+      # The search is indeed a bit lame for now, maybe we'll have some more fields in the future?
+      where_clause = t[:kb_payment_method_id].eq(search_key)
 
       query = t.where(where_clause)
                .order(t[:id])
@@ -63,7 +75,9 @@ module Killbill::Coinbase
 
     def to_payment_method_response
       properties = []
-      properties << create_pm_kv_info('apiKey', external_payment_method_id)
+      properties << create_pm_kv_info(COINBASE_API_KEY_KEY, coinbase_api_key)
+      properties << create_pm_kv_info(COINBASE_ACCESS_TOKEN_KEY, coinbase_access_token)
+      properties << create_pm_kv_info(COINBASE_REFRESH_TOKEN_KEY, coinbase_refresh_token)
 
       pm_plugin = Killbill::Plugin::Model::PaymentMethodPlugin.new
       pm_plugin.kb_payment_method_id = kb_payment_method_id

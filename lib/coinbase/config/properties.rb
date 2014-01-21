@@ -6,7 +6,7 @@ module Killbill::Coinbase
 
     def parse!
       raise "#{@config_file} is not a valid file" unless @config_file.file?
-      @config = YAML.load_file(@config_file.to_s)
+      @config = YAML.load_file(ERB.new(@config_file.to_s).result)
       validate!
     end
 

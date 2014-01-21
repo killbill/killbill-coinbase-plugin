@@ -17,12 +17,12 @@ describe Killbill::Coinbase::CoinbaseResponse do
 
     pms = @plugin.get_payment_methods(pm.kb_account_id)
     pms.size.should == 1
-    pms[0].external_payment_method_id.should == pm.coinbase_api_key
+    pms[0].external_payment_method_id.should == pm.id
 
     pm_details = @plugin.get_payment_method_detail(pm.kb_account_id, pm.kb_payment_method_id)
-    pm_details.external_payment_method_id.should == pm.coinbase_api_key
+    pm_details.external_payment_method_id.should == pm.id
 
-    pms_found = @plugin.search_payment_methods pm.coinbase_api_key
+    pms_found = @plugin.search_payment_methods pm.kb_payment_method_id
     pms_found = pms_found.iterator.to_a
     pms_found.size.should == 1
     pms_found.first.external_payment_method_id.should == pm_details.external_payment_method_id
@@ -337,9 +337,19 @@ eos
   # Large value, so it's not in our way
   def start_plugin(transactions_refresh_interval=10000)
     Dir.mktmpdir do |dir|
+      keys = File.new(File.join(dir, 'symmetric-encryption.yml'), "w+")
+      keys.write(<<-eos)
+test:
+  key:    1234567890ABCDEF1234567890ABCDEF
+  iv:     1234567890ABCDEF
+  cipher: aes-128-cbc
+      eos
+      keys.close
+
       file = File.new(File.join(dir, 'coinbase.yml'), "w+")
       file.write(<<-eos)
 :coinbase:
+  :test: true
   :btc_address: '#{MERCHANT_API_BTC_ADDRESS}'
   :api_key: '5678'
   :base_uri: '#{BASE_URI}'

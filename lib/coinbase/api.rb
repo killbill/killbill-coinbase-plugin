@@ -93,12 +93,19 @@ module Killbill::Coinbase
     end
 
     def add_payment_method(kb_account_id, kb_payment_method_id, payment_method_props, set_default, call_context = nil, options = {})
-      api_key = find_value_from_payment_method_props payment_method_props, 'apiKey'
-      raise ArgumentError.new("No api key specified") if (api_key.blank?)
+      api_key = find_value_from_payment_method_props payment_method_props, Killbill::Coinbase::CoinbasePaymentMethod::COINBASE_API_KEY_KEY
+      access_token = find_value_from_payment_method_props payment_method_props, Killbill::Coinbase::CoinbasePaymentMethod::COINBASE_ACCESS_TOKEN_KEY
+      refresh_token = find_value_from_payment_method_props payment_method_props, Killbill::Coinbase::CoinbasePaymentMethod::COINBASE_REFRESH_TOKEN_KEY
+      raise ArgumentError.new("No api key specified") if (api_key.blank? and access_token.blank?)
 
-      CoinbasePaymentMethod.create :kb_account_id => kb_account_id,
-                                   :kb_payment_method_id => kb_payment_method_id,
-                                   :coinbase_api_key => api_key
+      pm = CoinbasePaymentMethod.new :kb_account_id => kb_account_id,
+                                     :kb_payment_method_id => kb_payment_method_id
+      pm.coinbase_api_key = api_key
+      pm.coinbase_access_token = access_token
+      pm.coinbase_refresh_token = refresh_token
+      pm.save!
+
+      pm
     end
 
     def delete_payment_method(kb_account_id, kb_payment_method_id, call_context = nil, options = {})
@@ -118,39 +125,7 @@ module Killbill::Coinbase
     end
 
     def reset_payment_methods(kb_account_id, payment_methods)
-      return if payment_methods.nil?
-
-      coinbase_pms = CoinbasePaymentMethod.from_kb_account_id(kb_account_id)
-
-      payment_methods.delete_if do |payment_method_info_plugin|
-        should_be_deleted = false
-        coinbase_pms.each do |coinbase_pm|
-          # Do coinbase_pm and payment_method_info_plugin represent the same Coinbase payment method?
-          if coinbase_pm.external_payment_method_id == payment_method_info_plugin.external_payment_method_id
-            # Do we already have a kb_payment_method_id?
-            if coinbase_pm.kb_payment_method_id == payment_method_info_plugin.payment_method_id
-              should_be_deleted = true
-              break
-            elsif coinbase_pm.kb_payment_method_id.nil?
-              # We didn't have the kb_payment_method_id - update it
-              coinbase_pm.kb_payment_method_id = payment_method_info_plugin.payment_method_id
-              should_be_deleted = coinbase_pm.save
-              break
-              # Otherwise the same token points to 2 different kb_payment_method_id. This should never happen,
-              # but we cowardly will insert a second row below
-            end
-          end
-        end
-
-        should_be_deleted
-      end
-
-      # The remaining elements in payment_methods are not in our table (this should never happen?!)
-      payment_methods.each do |payment_method_info_plugin|
-        CoinbasePaymentMethod.create :kb_account_id => payment_method_info_plugin.account_id,
-                                     :kb_payment_method_id => payment_method_info_plugin.payment_method_id,
-                                     :coinbase_api_key => payment_method_info_plugin.external_payment_method_id
-      end
+      # No-op. We cannot match them.
     end
 
     def search_payments(search_key, offset = 0, limit = 100, call_context = nil, options = {})

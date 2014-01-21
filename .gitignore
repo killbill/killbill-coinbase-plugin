@@ -35,3 +35,7 @@ pom.xml.asc
 
 .idea/
 coinbase.yml
+
+.rails.iv
+.rails.key
+symmetric-encryption.yml

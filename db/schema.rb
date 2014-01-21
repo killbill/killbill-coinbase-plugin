@@ -4,7 +4,9 @@ ActiveRecord::Schema.define(:version => 20130311153635) do
   create_table "coinbase_payment_methods", :force => true do |t|
     t.string   "kb_account_id",          :null => false
     t.string   "kb_payment_method_id"    # NULL before Killbill knows about it
-    t.string   "coinbase_api_key",       :null => false
+    t.string   "encrypted_coinbase_api_key"
+    t.string   "encrypted_coinbase_access_token"
+    t.string   "encrypted_coinbase_refresh_token"
     t.boolean  "is_deleted",             :null => false, :default => false
     t.datetime "created_at",             :null => false
     t.datetime "updated_at",             :null => false
