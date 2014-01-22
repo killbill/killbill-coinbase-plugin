@@ -48,6 +48,9 @@ The plugin expects a `coinbase.yml` configuration file containing the following:
 ```
 :coinbase:
   :log_file: '/var/tmp/coinbase.log'
+  :refresh_interval: 120
+  # Trust Coinbase for the payment/refund status or delegate to the Bitcoin plugin?
+  :refresh_update_killbill: false
   # Switch to false for production
   :test: true
   # REQUIRED: your payout address

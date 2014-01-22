@@ -91,7 +91,23 @@ module Killbill::Coinbase
 
           unless transaction.nil?
             new_response = response.update_from_coinbase_transaction(transaction.transaction)
-            refreshed += 1 if transaction.transaction.status != 'pending'
+            if transaction.transaction.status != 'pending'
+              refreshed += 1
+
+              # Update the state in Kill Bill if required
+              if Killbill::Coinbase.transactions_refresh_update_killbill
+                success = (transaction.transaction.status == 'complete')
+
+                context = Killbill::Coinbase.kb_apis.create_context
+                kb_account_id = Killbill::Coinbase.kb_apis.payment_api.get_payment(response.kb_payment_id, false, context).get_account_id
+                account = Killbill::Coinbase.kb_apis.account_user_api.get_account_by_id(kb_account_id, context)
+                if response.api_call == 'charge'
+                  Killbill::Coinbase.kb_apis.payment_api.notify_pending_payment_of_state_changed(account, response.kb_payment_id, success, context)
+                elsif response.api_call == 'refund'
+                  Killbill::Coinbase.kb_apis.payment_api.notify_pending_refund_of_state_changed(account, response.kb_payment_id, success, context)
+                end
+              end
+            end
           end
         end
 

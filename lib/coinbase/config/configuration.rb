@@ -10,6 +10,7 @@ module Killbill::Coinbase
   mattr_reader :redirect_uri
   mattr_reader :merchant_btc_address
   mattr_reader :transactions_refresh_interval
+  mattr_reader :transactions_refresh_update_killbill
   mattr_reader :base_uri
 
   def self.initialize!(logger=Logger.new(STDOUT), conf_dir=File.expand_path('../../../', File.dirname(__FILE__)), kb_apis = nil)
@@ -30,6 +31,7 @@ module Killbill::Coinbase
 
     @@merchant_btc_address = @@config[:coinbase][:btc_address]
     @@transactions_refresh_interval = @@config[:coinbase][:refresh_interval] || 120
+    @@transactions_refresh_update_killbill = @@config[:coinbase][:refresh_update_killbill] || false
     @@base_uri = @@config[:coinbase][:base_uri] || 'https://coinbase.com/api/v1'
 
     @@logger.log_level = Logger::DEBUG if (@@config[:logger] || {})[:debug]
