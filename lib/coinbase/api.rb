@@ -36,8 +36,7 @@ module Killbill::Coinbase
       coinbase_pm = CoinbasePaymentMethod.from_kb_payment_method_id(kb_payment_method_id)
 
       # Go to Coinbase
-      gateway = Killbill::Coinbase.gateway_for_api_key(coinbase_pm.coinbase_api_key)
-      coinbase_response = gateway.send_money Killbill::Coinbase.merchant_btc_address, amount.to_money(currency), description
+      coinbase_response = CoinbaseClient.charge(coinbase_pm, amount, currency, description)
 
       # Regardless of the input currency, the actual payment is in BTC
       response = save_response_and_transaction coinbase_response, :charge, kb_payment_id, kb_payment_method_id, amount_in_cents, 'BTC'
@@ -49,9 +48,7 @@ module Killbill::Coinbase
       coinbase_transaction = CoinbaseTransaction.from_kb_payment_id(kb_payment_id)
 
       # Go to Coinbase to update the transaction state
-      gateway = Killbill::Coinbase.gateway_for_api_key(coinbase_transaction.coinbase_payment_method.coinbase_api_key)
-      # TODO https://coinbase.com/api/doc/1.0/transactions/show.html doesn't seem implemented yet :(
-      transaction = gateway.transactions.transactions.find { |tx| tx.transaction.id == coinbase_transaction.coinbase_txn_id }
+      transaction = CoinbaseClient.find_by_transaction_id(coinbase_transaction.coinbase_payment_method, coinbase_transaction.coinbase_txn_id)
       coinbase_transaction.coinbase_response.update_from_coinbase_transaction(transaction.transaction) unless transaction.nil?
 
       coinbase_transaction.coinbase_response.to_payment_response
@@ -66,9 +63,7 @@ module Killbill::Coinbase
       coinbase_transaction = CoinbaseTransaction.find_candidate_transaction_for_refund(kb_payment_id, amount)
 
       # Go to Coinbase
-      gateway = Killbill::Coinbase.gateway_for_api_key(Killbill::Coinbase.merchant_api_key)
-      btc_address = gateway.receive_address.address
-      coinbase_response = gateway.send_money btc_address, amount.to_money(currency), description
+      coinbase_response = CoinbaseClient.refund(coinbase_transaction.coinbase_payment_method, amount, currency, description)
 
       # Regardless of the input currency, the actual refund is in BTC
       response = save_response_and_transaction coinbase_response, :refund, kb_payment_id, coinbase_transaction.kb_payment_method_id, amount_in_cents, 'BTC'
@@ -82,9 +77,7 @@ module Killbill::Coinbase
       refund_infos = []
       coinbase_transactions.each do |coinbase_transaction|
         # Go to Coinbase to update the transaction state
-        gateway = Killbill::Coinbase.gateway_for_api_key(coinbase_transaction.coinbase_payment_method.coinbase_api_key)
-        # TODO https://coinbase.com/api/doc/1.0/transactions/show.html doesn't seem implemented yet :(
-        transaction = gateway.transactions.transactions.find { |tx| tx.transaction.id == coinbase_transaction.coinbase_txn_id }
+        transaction = CoinbaseClient.find_by_transaction_id(coinbase_transaction.coinbase_payment_method, coinbase_transaction.coinbase_txn_id)
         coinbase_transaction.coinbase_response.update_from_coinbase_transaction(transaction.transaction) unless transaction.nil?
 
         refund_infos << coinbase_transaction.coinbase_response.to_refund_response
@@ -148,7 +141,7 @@ module Killbill::Coinbase
     end
 
     def save_response_and_transaction(coinbase_response, api_call, kb_payment_id=nil, kb_payment_method_id=nil, amount_in_cents=0, currency=nil)
-      @logger.warn "Unsuccessful #{api_call}: #{coinbase_response.message}" unless coinbase_response.success?
+      @logger.warn "Unsuccessful #{api_call}: #{coinbase_response.message}" unless coinbase_response.success
 
       # Save the response to our logs
       response = CoinbaseResponse.from_response(api_call, kb_payment_id, coinbase_response)

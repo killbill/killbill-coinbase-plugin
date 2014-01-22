@@ -47,13 +47,14 @@ The plugin expects a `coinbase.yml` configuration file containing the following:
 
 ```
 :coinbase:
-  :btc_address: 'your-merchant-BTC-address'
   :log_file: '/var/tmp/coinbase.log'
   # Switch to false for production
   :test: true
-  # To use the API Key based login (users will have to share their Coinbase API Key)
+  # REQUIRED: your payout address
+  :btc_address: 'your-merchant-BTC-address'
+  # REQUIRED: your Coinbase apiKey (needed for refunds)
   :api_key: 'your-coinbase-API-key'
-  # To use the OAuth login
+  # OPTIONAL: you application OAuth details (to use the OAuth-based login mechanism)
   :client_id: 'your-application-client-id'
   :client_secret: 'your-application-client-secret'
   # Change it to your Kill Bill address (make sure to update Coinbase as well)

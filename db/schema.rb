@@ -49,6 +49,7 @@ ActiveRecord::Schema.define(:version => 20130311153635) do
     t.string   "coinbase_recipient_name"
     t.string   "coinbase_recipient_email"
     t.string   "coinbase_recipient_address"
+    t.text     "message"
     t.boolean  "success"
     t.datetime "created_at",        :null => false
     t.datetime "updated_at",        :null => false

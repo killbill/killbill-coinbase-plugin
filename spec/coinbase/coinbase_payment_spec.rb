@@ -51,7 +51,7 @@ describe Killbill::Coinbase::CoinbaseResponse do
     payment_response.currency.should == processed_currency
     payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     payment_response.status.should == :PENDING
-    payment_response.gateway_error.should == "pending"
+    payment_response.gateway_error.should be_nil
     payment_response.gateway_error_code.should be_nil
     payment_response.first_payment_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
     payment_response.second_payment_reference_id.should == "501a1791f8182b2071000087"
@@ -83,7 +83,7 @@ describe Killbill::Coinbase::CoinbaseResponse do
     payment_response.currency.should == processed_currency
     payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     payment_response.status.should == :PENDING # Still pending because we have a hash
-    payment_response.gateway_error.should == "complete"
+    payment_response.gateway_error.should be_nil
     payment_response.gateway_error_code.should be_nil
     payment_response.first_payment_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
     payment_response.second_payment_reference_id.should == "501a1791f8182b2071000087"
@@ -99,7 +99,7 @@ describe Killbill::Coinbase::CoinbaseResponse do
     refund_response.currency.should == processed_currency
     refund_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     refund_response.status.should == :PENDING
-    refund_response.gateway_error.should == "pending"
+    refund_response.gateway_error.should be_nil
     refund_response.gateway_error_code.should be_nil
     refund_response.first_refund_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
     refund_response.second_refund_reference_id.should == "501a1791f8182b2071000087"
@@ -134,7 +134,7 @@ describe Killbill::Coinbase::CoinbaseResponse do
     refund_response.currency.should == processed_currency
     refund_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     refund_response.status.should == :PENDING # Still pending because we have a hash
-    refund_response.gateway_error.should == "complete"
+    refund_response.gateway_error.should be_nil
     refund_response.gateway_error_code.should be_nil
     refund_response.first_refund_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
     refund_response.second_refund_reference_id.should == "501a1791f8182b2071000087"
@@ -150,7 +150,7 @@ describe Killbill::Coinbase::CoinbaseResponse do
     payment_response.currency.should == processed_currency
     payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     payment_response.status.should == :PENDING # Pending because no hash, but status is pending
-    payment_response.gateway_error.should == "pending"
+    payment_response.gateway_error.should be_nil
     payment_response.gateway_error_code.should be_nil
     payment_response.first_payment_reference_id.should be_blank
     payment_response.second_payment_reference_id.should == "501a1791f8182b2071000087"
@@ -161,7 +161,7 @@ describe Killbill::Coinbase::CoinbaseResponse do
     payment_response.currency.should == processed_currency
     payment_response.effective_date.should == "2012-08-01T23:00:49-07:00"
     payment_response.status.should == :PENDING # Pending because we now have a hash
-    payment_response.gateway_error.should == "complete"
+    payment_response.gateway_error.should be_nil
     payment_response.gateway_error_code.should be_nil
     payment_response.first_payment_reference_id.should == "9d6a7d1112c3db9de5315b421a5153d71413f5f752aff75bf504b77df4e646a3"
     payment_response.second_payment_reference_id.should == "501a1791f8182b2071000087"

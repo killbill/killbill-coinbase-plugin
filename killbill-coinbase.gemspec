@@ -28,8 +28,9 @@ Gem::Specification.new do |s|
   s.add_dependency 'activerecord', '~> 3.2.16'
   s.add_dependency 'activesupport', '~> 3.2.1'
   s.add_dependency 'symmetric-encryption', '~> 3.3'
-  # Locked version by the Coinbase gem
-  s.add_dependency 'money', '= 5.1.1'
+  s.add_dependency 'hashie', '~> 2.0.5'
+  s.add_dependency 'monetize', '~> 0.1.3'
+  s.add_dependency 'money', '~> 6.0.1'
   s.add_dependency 'oauth2', '~> 0.9.3'
   s.add_dependency 'sinatra', '~> 1.3.4'
   s.add_dependency 'thread', '~> 0.1.3'

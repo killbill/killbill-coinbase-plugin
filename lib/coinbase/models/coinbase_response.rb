@@ -18,6 +18,7 @@ module Killbill::Coinbase
                     :coinbase_recipient_name,
                     :coinbase_recipient_email,
                     :coinbase_recipient_address,
+                    :message,
                     :success
 
     alias_attribute :processed_amount_in_cents, :coinbase_amount_in_cents
@@ -27,6 +28,7 @@ module Killbill::Coinbase
       coinbase_response = {
                             :api_call => api_call,
                             :kb_payment_id => kb_payment_id,
+                            :message => response.message,
                             :success => response.success
                           }
 
@@ -39,39 +41,35 @@ module Killbill::Coinbase
                                    :coinbase_hsh => response.transaction.hsh,
                                    :coinbase_created_at => response.transaction.created_at,
                                    :coinbase_request => response.transaction.request,
-                                   # response.transaction.amount is a Money object.
-                                   # Note that for BTC, 1 cent is 1 Satoshi (1/100000000)
-                                   :coinbase_amount_in_cents => response.transaction.amount.cents,
-                                   :coinbase_currency => response.transaction.amount.currency.iso_code,
                                    :coinbase_notes => response.transaction.notes,
                                    :coinbase_status => response.transaction.status
                                 })
-      end
 
-      unless response.transaction.amount.blank?
-        coinbase_response.merge!({
-                                   # response.transaction.amount is a Money object.
-                                   # Note that for BTC, 1 cent is 1 Satoshi (1/100000000)
-                                   :coinbase_amount_in_cents => response.transaction.amount.cents,
-                                   :coinbase_currency => response.transaction.amount.currency.iso_code
-                                })
-      end
+        unless response.transaction.amount.blank?
+          coinbase_response.merge!({
+                                     # response.transaction.amount can be a Money object.
+                                     # Note that for BTC, 1 cent is 1 Satoshi (1/100000000)
+                                     :coinbase_amount_in_cents => response.transaction.amount.cents,
+                                     :coinbase_currency => response.transaction.amount.currency.is_a?(Money::Currency) ? response.transaction.amount.currency.iso_code : response.transaction.amount.currency
+                                  })
+        end
 
-      unless response.transaction.sender.blank?
-        coinbase_response.merge!({
-                                   :coinbase_sender_id => response.transaction.sender.id,
-                                   :coinbase_sender_name => response.transaction.sender.name,
-                                   :coinbase_sender_email => response.transaction.sender.email
-                                })
-      end
+        unless response.transaction.sender.blank?
+          coinbase_response.merge!({
+                                     :coinbase_sender_id => response.transaction.sender.id,
+                                     :coinbase_sender_name => response.transaction.sender.name,
+                                     :coinbase_sender_email => response.transaction.sender.email
+                                  })
+        end
 
-      unless response.transaction.recipient.blank?
-        coinbase_response.merge!({
-                                   :coinbase_recipient_id => response.transaction.recipient.id,
-                                   :coinbase_recipient_name => response.transaction.recipient.name,
-                                   :coinbase_recipient_email => response.transaction.recipient.email,
-                                   :coinbase_recipient_address => response.transaction.recipient_address
-                                })
+        unless response.transaction.recipient.blank?
+          coinbase_response.merge!({
+                                     :coinbase_recipient_id => response.transaction.recipient.id,
+                                     :coinbase_recipient_name => response.transaction.recipient.name,
+                                     :coinbase_recipient_email => response.transaction.recipient.email,
+                                     :coinbase_recipient_address => response.transaction.recipient_address
+                                  })
+        end
       end
 
       CoinbaseResponse.new(coinbase_response);
@@ -89,9 +87,7 @@ module Killbill::Coinbase
           pm = coinbase_transaction.coinbase_payment_method
 
           # Go to Coinbase to update the transaction state
-          gateway = Killbill::Coinbase.gateway_for_api_key(pm.coinbase_api_key)
-          # TODO https://coinbase.com/api/doc/1.0/transactions/show.html doesn't seem implemented yet :(
-          transaction = gateway.transactions.transactions.find { |tx| tx.transaction.id == coinbase_transaction.coinbase_txn_id }
+          transaction = CoinbaseClient.find_by_transaction_id(pm, coinbase_transaction.coinbase_txn_id)
 
           unless transaction.nil?
             new_response = response.update_from_coinbase_transaction(transaction.transaction)
@@ -194,7 +190,7 @@ module Killbill::Coinbase
         status = :ERROR
       end
       effective_date = coinbase_created_at
-      gateway_error = coinbase_status
+      gateway_error = message
       gateway_error_code = nil
 
       if type == :payment

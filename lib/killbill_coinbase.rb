@@ -1,6 +1,8 @@
 require 'active_support/core_ext'
 require 'active_record'
 require 'bigdecimal'
+require 'hashie'
+require 'monetize/core_extensions'
 require 'money'
 require 'oauth2'
 require 'openssl'
@@ -16,6 +18,7 @@ require 'killbill'
 require 'coinbase/config/configuration'
 require 'coinbase/config/properties'
 
+require 'coinbase/coinbase_client'
 require 'coinbase/api'
 
 require 'coinbase/models/coinbase_payment_method'

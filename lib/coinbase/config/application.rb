@@ -1,7 +1,15 @@
 configure do
   # Usage: rackup -Ilib -E test
   if development? or test?
-    Killbill::Coinbase.initialize! unless Killbill::Coinbase.initialized
+    @@plugin ||= begin
+      plugin = Killbill::Coinbase::PaymentPlugin.new
+      plugin.logger = Logger.new(STDOUT)
+      plugin.logger.level = Logger::INFO
+      plugin.conf_dir = File.expand_path('../../../..', __FILE__)
+      plugin.kb_apis = Killbill::Plugin::KillbillApi.new('coinbase', {})
+      plugin.start_plugin
+      plugin
+    end
   end
 end
 
@@ -55,12 +63,19 @@ get '/plugins/killbill-coinbase/1.0/pms', :provides => 'json' do
   pm.kb_account_id = session[:kb_account_id]
   pm.coinbase_access_token = resp.token
   pm.coinbase_refresh_token = resp.refresh_token
-  payment_method_plugin = pm.to_payment_method_response
 
-  # Create the payment method in Kill Bill
-  context = Killbill::Coinbase.kb_apis.create_context
-  account = Killbill::Coinbase.kb_apis.account_user_api.get_account_by_id(session[:kb_account_id], context)
-  pm_id = Killbill::Coinbase.kb_apis.payment_api.add_payment_method('killbill-coinbase', account, params[:default] || true, payment_method_plugin, context)
+  if development? or test?
+    pm.kb_payment_method_id = SecureRandom.uuid
+    pm.save!
+    pm_id = pm.kb_payment_method_id
+  else
+    payment_method_plugin = pm.to_payment_method_response
+
+    # Create the payment method in Kill Bill
+    context = Killbill::Coinbase.kb_apis.create_context
+    account = Killbill::Coinbase.kb_apis.account_user_api.get_account_by_id(session[:kb_account_id], context)
+    pm_id = Killbill::Coinbase.kb_apis.payment_api.add_payment_method('killbill-coinbase', account, params[:default] || true, payment_method_plugin, context)
+  end
 
   if pm = Killbill::Coinbase::CoinbasePaymentMethod.find_by_kb_payment_method_id(pm_id)
     pm.to_json
@@ -85,5 +100,78 @@ get '/plugins/killbill-coinbase/1.0/transactions/:id', :provides => 'json' do
   else
     status 404
   end
+end
+
+#
+# Test endpoints
+#
+
+# curl -v -XPOST http://127.0.0.1:9292/plugins/killbill-coinbase/test/paymentMethods --data-binary '{"apiKey":"a6b33ba1"}'
+post '/plugins/killbill-coinbase/test/paymentMethods', :provides => 'json' do
+  begin
+    data = JSON.parse request.body.read
+  rescue JSON::ParserError => e
+    halt 400, {'Content-Type' => 'text/plain'}, "Invalid payload: #{e}"
+  end
+
+  properties = []
+  prop = Killbill::Plugin::Model::PaymentMethodKVInfo.new
+  prop.key = Killbill::Coinbase::CoinbasePaymentMethod::COINBASE_API_KEY_KEY
+  prop.value = data['apiKey']
+  properties << prop
+
+  info = Killbill::Plugin::Model::PaymentMethodPlugin.new
+  info.properties = properties
+
+  response = @@plugin.add_payment_method SecureRandom.uuid,
+                                         SecureRandom.uuid,
+                                         info,
+                                         true
+  response.to_json
+end
+
+# curl -v -XPOST http://127.0.0.1:9292/plugins/killbill-coinbase/test/charge --data-binary '{"kb_payment_method_id":"a6b33ba1"}'
+post '/plugins/killbill-coinbase/test/charge', :provides => 'json' do
+  begin
+    data = JSON.parse request.body.read
+  rescue JSON::ParserError => e
+    halt 400, {'Content-Type' => 'text/plain'}, "Invalid payload: #{e}"
+  end
+
+  response = @@plugin.process_payment SecureRandom.uuid,
+                                      SecureRandom.uuid,
+                                      data['kb_payment_method_id'],
+                                      data['amount_in_cents'] || 0.0020,
+                                      data['currency'] || 'BTC'
+  response.to_json
+end
+
+# curl -v http://127.0.0.1:9292/plugins/killbill-coinbase/test/payments/a6b33ba1
+get '/plugins/killbill-coinbase/test/payments/:id', :provides => 'json' do
+  response = @@plugin.get_payment_info SecureRandom.uuid,
+                                       params[:id]
+  response.to_json
+end
+
+# curl -v -XPOST http://127.0.0.1:9292/plugins/killbill-coinbase/test/refund --data-binary '{"kb_payment_id":"a6b33ba1"}'
+post '/plugins/killbill-coinbase/test/refund', :provides => 'json' do
+  begin
+    data = JSON.parse request.body.read
+  rescue JSON::ParserError => e
+    halt 400, {'Content-Type' => 'text/plain'}, "Invalid payload: #{e}"
+  end
+
+  response = @@plugin.process_refund SecureRandom.uuid,
+                                     data['kb_payment_id'],
+                                     data['amount_in_cents'] || 0.0020,
+                                     data['currency'] || 'BTC'
+  response.to_json
+end
+
+# curl -v http://127.0.0.1:9292/plugins/killbill-coinbase/test/refunds/a6b33ba1
+get '/plugins/killbill-coinbase/test/refunds/:id', :provides => 'json' do
+  response = @@plugin.get_refund_info SecureRandom.uuid,
+                                      params[:id]
+  response.to_json
 end
 

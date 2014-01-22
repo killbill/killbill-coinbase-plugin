@@ -1,7 +1,3 @@
-require 'logger'
-# Coinbase gem
-require 'coinbase'
-
 module Killbill::Coinbase
   mattr_reader :logger
   mattr_reader :config
@@ -14,6 +10,7 @@ module Killbill::Coinbase
   mattr_reader :redirect_uri
   mattr_reader :merchant_btc_address
   mattr_reader :transactions_refresh_interval
+  mattr_reader :base_uri
 
   def self.initialize!(logger=Logger.new(STDOUT), conf_dir=File.expand_path('../../../', File.dirname(__FILE__)), kb_apis = nil)
     @@logger = logger
@@ -53,9 +50,5 @@ module Killbill::Coinbase
     SymmetricEncryption.load!("#{conf_dir}/symmetric-encryption.yml", @@test ? 'test' : 'production')
 
     @@initialized = true
-  end
-
-  def self.gateway_for_api_key(api_key)
-    ::Coinbase::Client.new(api_key, { :base_uri => @@base_uri })
   end
 end
