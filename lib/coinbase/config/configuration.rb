@@ -1,5 +1,6 @@
 module Killbill::Coinbase
   mattr_reader :logger
+  mattr_reader :conf_dir
   mattr_reader :config
   mattr_reader :kb_apis
   mattr_reader :initialized
@@ -16,6 +17,7 @@ module Killbill::Coinbase
   def self.initialize!(logger=Logger.new(STDOUT), conf_dir=File.expand_path('../../../', File.dirname(__FILE__)), kb_apis = nil)
     @@logger = logger
     @@kb_apis = kb_apis
+    @@conf_dir = conf_dir
 
     config_file = "#{conf_dir}/coinbase.yml"
     @@config = Properties.new(config_file)

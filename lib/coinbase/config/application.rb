@@ -5,7 +5,7 @@ configure do
       plugin = Killbill::Coinbase::PaymentPlugin.new
       plugin.logger = Logger.new(STDOUT)
       plugin.logger.level = Logger::INFO
-      plugin.conf_dir = File.expand_path('../../../..', __FILE__)
+      plugin.conf_dir = Killbill::Coinbase.conf_dir || File.expand_path('../../../..', __FILE__)
       plugin.kb_apis = Killbill::Plugin::KillbillApi.new('coinbase', {})
       plugin.start_plugin
       plugin
