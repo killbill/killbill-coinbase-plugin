@@ -14,9 +14,11 @@ The plugin needs a database. The latest version of the schema can be found here:
 Usage
 -----
 
-In this version, users need to provide their Coinbase API key. This is unfortunate but required in order to Kill Bill to transfer Bitcoins on the user's behalf. Maybe one day Coinbase will provide some sort of revokable token, potentially with a monthly max transfer amount, for such scenarii?
+In order to collect users' Coinbase information, you can either request their API key or use OAuth.
 
-To enable API access, go to https://coinbase.com/account/integrations, click "Show My API Key", enter your password and click enable.
+### API key
+
+Users will need to enable API access on their account: go to https://coinbase.com/account/integrations, click "Show My API Key", enter your password and click enable.
 
 Then, save the key in Kill Bill as a new payment method:
 
@@ -40,6 +42,13 @@ curl -v \
      "http://$HOST:8080/1.0/kb/accounts/13d26090-b8d7-11e2-9e96-0800200c9a66/paymentMethods?isDefault=true"
 ```
 
+### OAuth
+
+As a merchant, you first need to create an application by going to https://coinbase.com/oauth/applications.
+
+To add a payment method, make users grant your application access by going through the OAuth flow at `http://$HOST.com:8080/plugins/killbill-coinbase/1.0/authorize?kb_account_id=13d26090-b8d7-11e2-9e96-0800200c9a66` (update `kb_account_id` with the user Kill Bill account id).
+
+
 Configuration
 -------------
 
@@ -60,8 +69,11 @@ The plugin expects a `coinbase.yml` configuration file containing the following:
   # OPTIONAL: you application OAuth details (to use the OAuth-based login mechanism)
   :client_id: 'your-application-client-id'
   :client_secret: 'your-application-client-secret'
-  # Change it to your Kill Bill address (make sure to update Coinbase as well)
+  # OAuth redirect (from Coinbase, back to Kill Bill).
+  # Change the host to match your Kill Bill address (make sure to update Coinbase as well)
   :redirect_uri: 'http://127.0.0.1:8080/plugins/killbill-coinbase/1.0/pms'
+  # Final OAuth redirect (after the payment method has been saved)
+  :app_redirect_uri: 'http://example.com/thank-you'
 
 :database:
   :adapter: 'sqlite3'
