@@ -9,6 +9,7 @@ module Killbill::Coinbase
   mattr_reader :client_id
   mattr_reader :client_secret
   mattr_reader :redirect_uri
+  mattr_reader :app_redirect_uri
   mattr_reader :merchant_btc_address
   mattr_reader :transactions_refresh_interval
   mattr_reader :transactions_refresh_update_killbill
@@ -30,6 +31,7 @@ module Killbill::Coinbase
     @@client_secret = @@config[:coinbase][:client_secret]
     # This must match the url you set during registration
     @@redirect_uri = @@config[:coinbase][:redirect_uri]
+    @@app_redirect_uri = @@config[:coinbase][:app_redirect_uri]
 
     @@merchant_btc_address = @@config[:coinbase][:btc_address]
     @@transactions_refresh_interval = @@config[:coinbase][:refresh_interval] || 120

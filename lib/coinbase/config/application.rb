@@ -77,10 +77,11 @@ get '/plugins/killbill-coinbase/1.0/pms', :provides => 'json' do
     pm_id = Killbill::Coinbase.kb_apis.payment_api.add_payment_method('killbill-coinbase', account, params[:default] || true, payment_method_plugin, context)
   end
 
-  if pm = Killbill::Coinbase::CoinbasePaymentMethod.find_by_kb_payment_method_id(pm_id)
-    pm.to_json
+  if !Killbill::Coinbase.app_redirect_uri.blank?
+    redirect Killbill::Coinbase.app_redirect_uri
   else
-    status 404
+    pm = Killbill::Coinbase::CoinbasePaymentMethod.find_by_kb_payment_method_id(pm_id)
+    pm.to_json
   end
 end
 
