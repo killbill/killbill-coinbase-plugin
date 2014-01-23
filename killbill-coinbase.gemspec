@@ -23,8 +23,6 @@ Gem::Specification.new do |s|
   s.rdoc_options << '--exclude' << '.'
 
   s.add_dependency 'killbill', '~> 2.0.0'
-  # Required to avoid errors like java.lang.NoClassDefFoundError: org/bouncycastle/asn1/DERBoolean
-  s.add_dependency 'jruby-openssl', '~> 0.9.4'
   s.add_dependency 'activerecord', '~> 3.2.16'
   s.add_dependency 'activesupport', '~> 3.2.1'
   s.add_dependency 'symmetric-encryption', '~> 3.3'
@@ -37,6 +35,8 @@ Gem::Specification.new do |s|
   s.add_dependency 'coinbase', '~> 1.2.4'
   if defined?(JRUBY_VERSION)
     s.add_dependency 'activerecord-jdbcmysql-adapter', '~> 1.2.9'
+    # Required to avoid errors like java.lang.NoClassDefFoundError: org/bouncycastle/asn1/DERBoolean
+    s.add_dependency 'jruby-openssl', '~> 0.9.4'
   end
 
   s.add_development_dependency 'jbundler', '~> 0.4.1'
