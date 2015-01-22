@@ -1,6 +1,3 @@
-[![Build Status](https://travis-ci.org/killbill/killbill-coinbase-plugin.png)](https://travis-ci.org/killbill/killbill-coinbase-plugin)
-[![Code Climate](https://codeclimate.com/github/killbill/killbill-coinbase-plugin.png)](https://codeclimate.com/github/killbill/killbill-coinbase-plugin)
-
 killbill-coinbase-plugin
 ========================
 
