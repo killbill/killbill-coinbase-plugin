@@ -3,6 +3,13 @@ killbill-coinbase-plugin
 
 Plugin to use Coinbase as a gateway.
 
+Kill Bill compatibility
+-----------------------
+
+| Plugin version | Kill Bill version |
+| -------------: | ----------------: |
+| 0.0.y          | 0.14.z            |
+
 Requirements
 ------------
 
